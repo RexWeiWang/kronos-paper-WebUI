@@ -1,0 +1,18 @@
+{
+  "symbols": {"510300":"沪深300ETF", "510500":"中证500ETF", "159915":"创业板ETF", "588000":"科创50ETF", "512100":"中证1000ETF"},
+  "initial_cash": 100000,
+  "lookback": 256,
+  "horizon": 5,
+  "max_holdings": 3,
+  "signal_threshold": 0.0,
+  "seed": 42,
+  "top_k": 1,
+  "sample_count": 1,
+  "commission_rate": 0.0003,
+  "minimum_commission": 5.0,
+  "slippage_bps": 5,
+  "max_volume_participation": 0.01,
+  "lot_size": 100,
+  "device": "auto",
+  "data_start": "2023-01-01"
+}

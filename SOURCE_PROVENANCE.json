@@ -1,0 +1,7 @@
+{
+  "source_project": "https://github.com/shiyu-coder/Kronos",
+  "upstream_revision": "67b630e67f6a18c9e9be918d9b4337c960db1e9a",
+  "snapshot_date": "2026-11-26",
+  "customizations": "Local Chinese research and simulation platform",
+  "excluded": "Credentials, local account identifiers, databases, reports, cache, model weights, environments and upstream Git history"
+}

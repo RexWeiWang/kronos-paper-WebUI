@@ -1,0 +1,89 @@
+Kronos-base · 本机 A 股 ETF 虚拟交易
+部署日期：2026-11-24（北京时间）
+
+一、安装位置与运行方式
+项目位于 项目克隆目录。
+Python 3.12 独立环境在 .venv 中；模型在 models 中；官方源码在 vendor/Kronos。
+采用 PyTorch MPS 使用苹果 GPU，未量化、未微调，FP32 原始权重。
+运行时必须进入项目目录；模型推理读取本地权重，不依赖远程推理 API。
+行情更新需要联网。Mac 在使用期间应保持唤醒，结束后可以休眠。
+
+双击：
+  更新虚拟账户.command   下载行情、更新前向纸面账户、打开报告。
+  运行单标的预测.command 下载行情，预测 510300，打开预测 CSV。
+  运行历史回测.command   基于本地数据重跑最近 63 个交易日的回放。
+
+建议每个交易日北京时间 18:00 后双击“更新虚拟账户.command”。
+本次没有安装定时任务；需要手动运行。重复更新同一日期不会重复成交。
+如果系统提示脚本无法运行，可在终端使用下列命令，不需要更改系统安全设置。
+
+终端命令（先 cd 到项目目录）：
+  .venv/bin/python app.py fetch
+  .venv/bin/python app.py predict --symbol 510300
+  .venv/bin/python app.py backtest --days 63
+  .venv/bin/python app.py paper
+  .venv/bin/python -m pytest -q test_accounting.py
+
+二、如何看结果
+  reports/single_prediction.json 与 .csv：单标的未来 5 个交易日的模型输出。
+  reports/backtest/report.html：历史回放策略和等权买入持有的费用后对比。
+  reports/paper/report.html：前向虚拟账户。
+  reports/paper/summary.json：最新候选信号和待执行的模拟订单。
+  reports/*/trades.csv：实际已记账的模拟成交。
+  reports/*/orders.csv：含被拒绝及部分成交的订单。
+  reports/*/equity.csv：现金、应收分红、持仓及每日净值。
+  reports/*/input_bars：该报告使用的原始行情和分红快照。
+  state/paper.json：持久化前向账户。不要删除，否则会新建一个账户。
+
+历史回放的数据已经发生过；前向账户只执行在开盘前已经保存的信号。
+首次盘中启动时可能依据前一收盘日信号排队到下一未来开盘，不倒填当天开盘。
+日线以 18:00 为可使用的确认时点，当天盘中数据会被排除。
+漏跑多日时：可结算事先保存的订单，不追造漏掉日期的模型信号。
+
+三、固定实验配置
+标的：510300 沪深300ETF、510500 中证500ETF、159915 创业板ETF、
+      588000 科创50ETF、512100 中证1000ETF。
+初始虚拟资金 100000 元；只做多；最多 3 个持仓；不借贷。
+输入最近 256 根日线，预测未来 5 个交易日。
+初始信号后，每周最后一个交易日收盘产生信号；下一交易日开盘模拟成交。
+预测收益 > 0 的前三只各分配 1/3 目标权重；空缺的份额留现金。
+解码采用 top_k=1、sample_count=1、随机种子42；用于可重复的首版基线。
+这与论文中的全部组合和采样设置并不相同，不能视为论文业绩复现。
+
+费用假设：佣金万分之三、每笔最低5元；买卖各5个基点不利滑点。
+交易单位100份；卖出先于买入；限制为前日成交量的1%。
+开盘触及相应涨跌停价则跳过不利方向的订单，未成交部分不自动补单。
+当前股票ETF按T+1持仓交易；本系统不包含券商真实交易接口。
+日线无法确认开盘实际流动性、排队或部分停牌，成交结果属于近似模拟。
+佣金假设需要根据将来实际券商费率调整，不是对实际费率的陈述。
+
+四、数据与分红
+行情：优先使用 AKShare fund_etf_hist_sina（新浪），失败时使用 fund_etf_hist_em（东方财富）。
+使用未复权实际价格记账；来源写入清单。新浪成交量为份，东方财富成交量由手转换成份。
+成交额单位元。日期、OHLC、缺失交易日和哈希均校验。
+分红：fund_open_fund_info_em，区分权益登记日、除息日与到账日。
+登记日收盘记录权益；除息日建立应收款；支付日转入可用现金。
+模型输入仅用截至预测日已生效的现金分红调整历史价格，不使用未来分红。
+当前不支持份额拆分：发现数据范围内的拆分就报错，不默默记错份额。
+2022年510500曾拆分，因此本实验数据从2023年开始。
+市场日历使用 exchange_calendars 的 XSHG 已知节假日。
+遇到未支持的新年度日历会停止，需更新依赖，不能用工作日猜测交易日。
+行情或公司行动接口失败时停止更新；不要把缺失数据填成虚拟行情。
+
+五、可重复性与扩展
+config.json 保存配置；requirements.lock.txt 保存本次安装的精确依赖版本。
+models/manifest.json 保存两个模型的不可变仓库提交号。
+每次报告保存官方源码提交号、脚本哈希、输入校验值、设备、参数和数据快照。
+data/predictions 缓存按输入、模型版本、解码参数和设备散列的预测结果。
+修改配置、模型、设备或推理版本后，前向账户会拒绝混用，需要另建实验目录。
+已有报告会被同类命令覆盖；要保留一次实验，请先复制对应 reports 子目录。
+
+重建环境（已有 uv 和 Python 可用时）：
+  ../.runtime/bin/uv --cache-dir .cache/uv venv --python ../.runtime/python/cpython-3.12-macos-aarch64-none/bin/python3 .venv
+  ../.runtime/bin/uv --cache-dir .cache/uv pip install --python .venv/bin/python -r requirements.lock.txt
+  .venv/bin/python download_models.py
+download_models.py 首次解析模型当前版本并写入 manifest，之后沿用固定 revision；要精确复现旧实验，
+保留现有 models 目录，或按报告记录的 revision 从 Hugging Face 获取快照。
+
+本实验没有审计模型的完整预训练数据覆盖时间，也没有证明未来交易有效性。
+历史回测用于验证流程和比较固定规则，前向账户需要持续积累新记录。
